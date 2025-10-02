@@ -4,67 +4,60 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Libro;
+use App\Services\LibroService;
+
 class LibroController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    protected $libroService;
+
+    public function __construct(LibroService $libroService)
+    {
+        $this->libroService = $libroService;
+    }
+
     public function index()
     {
         return Libro::with(['autor', 'genero'])->get();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-  public function store(Request $request)
+    public function store(Request $request)
     {
         $data = $request->validate([
             'titulo' => 'required',
-            'autor_id' => 'nullable|exists:autores,id',
-            'genero_id' => 'nullable|exists:generos,id',
+            'autor_id' => 'required|exists:autores,id',
+            'genero_id' => 'required|exists:generos,id',
             'isbn' => 'nullable|unique:libros',
             'copias_totales' => 'required|integer|min:1',
         ]);
 
-        $data['copias_disponibles'] = $data['copias_totales'];
-
-        return Libro::create($data);
+        return $this->libroService->crear($data);
     }
 
-    /**
-     * Display the specified resource.
-     */
-  public function show(Libro $libro)
+    public function show(Libro $libro)
     {
         return $libro->load(['autor', 'genero']);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Libro $libro)
     {
         $data = $request->validate([
             'titulo' => 'required',
-            'autor_id' => 'nullable|exists:autores,id',
-            'genero_id' => 'nullable|exists:generos,id',
+            'autor_id' => 'required|exists:autores,id',
+            'genero_id' => 'required|exists:generos,id',
             'isbn' => 'nullable|unique:libros,isbn,' . $libro->id,
             'copias_totales' => 'required|integer|min:1',
         ]);
 
-        $libro->update($data);
-
-        return $libro;
+        return $this->libroService->actualizar($libro, $data);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Libro $libro)
     {
-        $libro->delete();
-
-        return response()->noContent();
+        try {
+            $this->libroService->eliminar($libro);
+            return response()->noContent();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->errors()['message']], 400);
+        }
     }
 }

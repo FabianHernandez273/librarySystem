@@ -4,21 +4,22 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Prestamo;
-use App\Models\Libro;
+use App\Services\PrestamoService;
 
 class PrestamoController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    protected $prestamoService;
+
+    public function __construct(PrestamoService $prestamoService)
+    {
+        $this->prestamoService = $prestamoService;
+    }
+
     public function index()
     {
         return Prestamo::with(['libro', 'user'])->get();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -28,30 +29,13 @@ class PrestamoController extends Controller
             'fecha_devolucion' => 'required|date|after_or_equal:fecha_prestamo',
         ]);
 
-        // Actualizar disponibilidad del libro
-        $libro = Libro::findOrFail($data['libro_id']);
-        if ($libro->copias_disponibles < 1) {
-            return response()->json(['message' => 'No hay copias disponibles'], 400);
+        try {
+            $prestamo = $this->prestamoService->crear($data);
+            return response()->json($prestamo, 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->errors()['message']], 400);
         }
-        $libro->copias_disponibles -= 1;
-        $libro->save();
-
-        $prestamo = Prestamo::create($data);
-
-        return response()->json($prestamo, 201);
     }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
 
     public function update(Request $request, Prestamo $prestamo)
     {
@@ -60,32 +44,21 @@ class PrestamoController extends Controller
             'estado' => 'nullable|in:prestado,devuelto,vencido',
         ]);
 
-        $prestamo->update($data);
-
-        // Si se devuelve, actualizar disponibilidad del libro
-        if (isset($data['fecha_devuelto']) && $prestamo->estado !== 'devuelto') {
-            $prestamo->libro->copias_disponibles += 1;
-            $prestamo->libro->save();
-            $prestamo->estado = 'devuelto';
-            $prestamo->save();
+        try {
+            if (isset($data['fecha_devuelto']) || ($data['estado'] ?? '') === 'devuelto') {
+                $prestamo = $this->prestamoService->devolver($prestamo, $data['fecha_devuelto'] ?? null);
+            } else {
+                $prestamo->update($data);
+            }
+            return response()->json($prestamo);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->errors()['message']], 400);
         }
-
-        return response()->json($prestamo);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Prestamo $prestamo)
     {
-        // Devolver libro si estaba prestado
-        if ($prestamo->estado === 'prestado') {
-            $prestamo->libro->copias_disponibles += 1;
-            $prestamo->libro->save();
-        }
-
-        $prestamo->delete();
-
+        $this->prestamoService->eliminar($prestamo);
         return response()->noContent();
     }
 }
