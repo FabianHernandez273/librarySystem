@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Libro extends Model
 {
+        use HasFactory;
     // Campos que se pueden asignar en create() o update()
     protected $fillable = [
         'titulo',
@@ -32,4 +34,6 @@ class Libro extends Model
     {
         return $this->hasMany(Prestamo::class);
     }
+
+    
 }
