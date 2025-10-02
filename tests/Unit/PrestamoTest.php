@@ -12,7 +12,7 @@ class PrestamoTest extends TestCase
 {
     use RefreshDatabase; // Limpia la DB entre pruebas
 
-    /** @test */
+   #[\PHPUnit\Framework\Attributes\Test]
     public function puede_crear_un_prestamo_si_hay_copias_disponibles()
     {
         $user = User::factory()->create();
@@ -29,11 +29,11 @@ class PrestamoTest extends TestCase
         ]);
 
         $response->assertStatus(201)
-                 ->assertJsonFragment([
-                     'libro_id' => $libro->id,
-                     'user_id' => $user->id,
-                     'estado' => 'prestado'
-                 ]);
+            ->assertJsonFragment([
+                'libro_id' => $libro->id,
+                'user_id' => $user->id,
+                'estado' => 'prestado'
+            ]);
 
         $this->assertDatabaseHas('prestamos', [
             'libro_id' => $libro->id,
@@ -44,7 +44,7 @@ class PrestamoTest extends TestCase
         $this->assertEquals(2, $libro->copias_disponibles); // Copia restada
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function no_puede_crear_prestamo_si_no_hay_copias()
     {
         $user = User::factory()->create();
@@ -61,12 +61,14 @@ class PrestamoTest extends TestCase
         ]);
 
         $response->assertStatus(400)
-                 ->assertJson([
-                     'message' => 'No hay copias disponibles'
-                 ]);
+            ->assertJson([
+                'message' => [
+                    0 => 'No hay copias disponibles para este libro.'
+                ]
+            ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function puede_devolver_un_libro()
     {
         $user = User::factory()->create();
@@ -88,7 +90,7 @@ class PrestamoTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-                 ->assertJsonFragment(['estado' => 'devuelto']);
+            ->assertJsonFragment(['estado' => 'devuelto']);
 
         $libro->refresh();
         $this->assertEquals(3, $libro->copias_disponibles); // Copia devuelta
